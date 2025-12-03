@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CORS Test</title>
+</head>
+<body>
+    <h1>Testing Remotion API from Browser</h1>
+    <button onclick="testAPI()">Test API</button>
+    <pre id="output"></pre>
+
+    <script>
+        async function testAPI() {
+            const output = document.getElementById('output');
+            output.textContent = 'Testing...';
+            
+            try {
+                const response = await fetch('http://localhost:3001/health');
+                const data = await response.json();
+                output.textContent = 'SUCCESS!\n' + JSON.stringify(data, null, 2);
+            } catch (error) {
+                output.textContent = 'ERROR: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

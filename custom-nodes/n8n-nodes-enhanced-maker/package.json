@@ -1,0 +1,23 @@
+{
+  "name": "n8n-nodes-enhanced-maker",
+  "version": "1.0.0",
+  "description": "Minimal custom node exposing EnhancedRedisStateManager and EnhancedMessageQueue",
+  "license": "UNLICENSED",
+  "author": "",
+  "main": "dist/index.js",
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "nodes": [
+      "dist/nodes/EnhancedMaker.node.js"
+    ]
+  },
+  "keywords": ["n8n", "nodes", "enhanced-maker", "redis", "rabbitmq"],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.3",
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

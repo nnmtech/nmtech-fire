@@ -1,0 +1,86 @@
+services:
+  # Original n8n instance (unchanged)
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    env_file:
+      - .env
+    environment:
+      - TRUST_PROXY=1
+      - EXPRESS_TRUST_PROXY=true
+      - MCP_BRAVE_API_KEY=your-api-key-here
+      - MCP_OPENAI_API_KEY=your-openai-key-here
+      - MCP_CUSTOM_SETTING=some-value
+      - N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE=true
+    volumes:
+      - ngrok_n8n_data:/home/node/.n8n  # Updated volume name
+    networks:
+      - n8n_network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "sh",
+          "-c",
+          "wget --spider -q http://localhost:5678/healthz || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # NEW n8n instance (added)
+  n8n-instance-2:
+    image: n8nio/n8n:latest
+    container_name: n8n-instance-2
+    restart: unless-stopped
+    ports:
+      - "5679:5678"  # Different host port
+    env_file:
+      - .env         # Same environment file
+    environment:
+      - TRUST_PROXY=1
+      - EXPRESS_TRUST_PROXY=true
+    volumes:
+      - ngrok_n8n_data_2:/home/node/.n8n  # Updated volume name
+    networks:
+      - n8n_network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "sh",
+          "-c",
+          "wget --spider -q http://localhost:5678/healthz || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ngrok (unchanged - still points to original n8n)
+  grok:
+    image: ngrok/ngrok:latest
+    container_name: ngrok
+    restart: unless-stopped
+    command: http --log=debug --domain=nonpreventive-unaccelerative-anna.ngrok-free.dev n8n:5678
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    depends_on:
+      n8n:
+        condition: service_healthy
+    networks:
+      - n8n_network
+
+volumes:
+  ngrok_n8n_data:      # Updated volume name
+    external: true      # Mark as externally created
+  ngrok_n8n_data_2:    # Updated volume name
+    external: true      # Mark as externally created
+
+networks:
+  n8n_network:
+    driver: bridge

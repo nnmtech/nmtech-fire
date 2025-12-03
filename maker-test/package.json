@@ -1,0 +1,13 @@
+{
+  "name": "maker-test",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.4",
+    "ioredis": "^5.4.1"
+  }
+}

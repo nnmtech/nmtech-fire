@@ -1,0 +1,94 @@
+{
+  "name": "Remotion Video Renderer Example",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "c084b5b0-8b9a-4f5e-9a3a-1234567890ab",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "video-text",
+              "name": "videoText",
+              "value": "Hello from Enhanced MAKER!",
+              "type": "string"
+            },
+            {
+              "id": "bg-color",
+              "name": "backgroundColor",
+              "value": "#1a1a1a",
+              "type": "string"
+            },
+            {
+              "id": "text-color",
+              "name": "textColor",
+              "value": "#00ff88",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d194c6c0-9c0b-5f6f-0b4b-2345678901bc",
+      "name": "Set Video Parameters",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://remotion-renderer:3001/render",
+        "authentication": "none",
+        "requestMethod": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"executionId\": \"{{ $execution.id }}\",\n  \"composition\": \"TextScene\",\n  \"inputProps\": {\n    \"text\": \"{{ $json.videoText }}\",\n    \"backgroundColor\": \"{{ $json.backgroundColor }}\",\n    \"textColor\": \"{{ $json.textColor }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "e2a4d7d0-0d1c-6g7g-1c5c-3456789012cd",
+      "name": "Render Video with Remotion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [680, 300]
+    }
+  ],
+  "connections": {
+    "When clicking 'Test workflow'": {
+      "main": [
+        [
+          {
+            "node": "Set Video Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Video Parameters": {
+      "main": [
+        [
+          {
+            "node": "Render Video with Remotion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-12-02T00:00:00.000Z",
+  "versionId": "12345678-1234-1234-1234-123456789012"
+}

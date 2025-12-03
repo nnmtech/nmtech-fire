@@ -1,0 +1,237 @@
+
+
+services:
+  # Primary n8n instance with your workflows
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    env_file:
+      - .env
+    environment:
+      - TRUST_PROXY=1
+      - EXPRESS_TRUST_PROXY=true
+      - REDIS_URL=${REDIS_URL}
+      - MESSAGE_QUEUE_URL=${MESSAGE_QUEUE_URL}
+      - N8N_CUSTOM_EXTENSIONS=/opt/custom-nodes
+    volumes:
+      - ngrok_n8n_data_2:/home/node/.n8n  # Using the working volume
+      - /home/nmtech/n8n/custom-nodes:/opt/custom-nodes:ro
+      - /home/nmtech/n8n/ENHANCED MAKER Video Generatorv2:/opt/enhanced-maker/enhanced-maker.js:ro
+    networks:
+      - n8n_network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "sh",
+          "-c",
+          "wget --spider -q http://localhost:5678/healthz || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # NEW n8n instance (added)
+  n8n-instance-2:
+    image: n8nio/n8n:latest
+    container_name: n8n-instance-2
+    restart: unless-stopped
+    ports:
+      - "5679:5678"  # Different host port
+    env_file:
+      - .env         # Same environment file
+    environment:
+      - TRUST_PROXY=1
+      - EXPRESS_TRUST_PROXY=true
+      - REDIS_URL=${REDIS_URL}
+      - MESSAGE_QUEUE_URL=${MESSAGE_QUEUE_URL}
+      - N8N_CUSTOM_EXTENSIONS=/home/node/.n8n/custom-nodes
+    volumes:
+      - /home/nmtech/.n8n:/home/node/.n8n  # Original data location with workflows
+      - /home/nmtech/n8n/custom-nodes:/opt/custom-nodes:ro
+      - /home/nmtech/n8n/ENHANCED MAKER Video Generatorv2:/opt/enhanced-maker/enhanced-maker.js:ro
+    networks:
+      - n8n_network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "sh",
+          "-c",
+          "wget --spider -q http://localhost:5678/healthz || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ngrok (unchanged - still points to original n8n)
+  grok:
+    image: ngrok/ngrok:latest
+    container_name: ngrok
+    restart: unless-stopped
+    command: http -- 38a4cfa95fe4.ngrok-free.app n8n:5678
+    environment:
+      - NGROUTHTOKEN=${NGROK_AUTHTOKEN}
+    depends_on:
+      n8n:
+        condition: service_healthy
+    networks:
+      - n8n_network
+
+  # Redis for state/cache
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - n8n_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ for message queueing
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - n8n_network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  # Minimal Node-based connectivity test
+  maker-test:
+    image: node:20-alpine
+    container_name: maker-test
+    working_dir: /app
+    restart: "no"
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      REDIS_URL: redis://redis:6379
+      AMQP_URL: amqp://guest:guest@rabbitmq:5672
+    volumes:
+      - ./maker-test:/app:ro
+    command: sh -lc "npm install --omit=dev && node index.js"
+    networks:
+      - n8n_network
+
+  maker-runner:
+    image: node:20-alpine
+    container_name: maker-runner
+    working_dir: /app
+    restart: "no"
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      REDIS_URL: redis://redis:6379
+      MESSAGE_QUEUE_URL: amqp://guest:guest@rabbitmq:5672
+    volumes:
+      - ./maker-runner:/app:ro
+      - /home/nmtech/n8n/ENHANCED MAKER Video Generatorv2:/opt/enhanced-maker/enhanced-maker.js:ro
+    command: sh -lc "npm install --omit=dev && node index.js"
+    networks:
+      - n8n_network
+
+  # Remotion Video Renderer Service
+  remotion-renderer:
+    build: ./remotion-renderer
+    container_name: remotion-renderer
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - MESSAGE_QUEUE_URL=amqp://guest:guest@rabbitmq:5672
+      - ENHANCED_MAKER_PATH=/opt/enhanced-maker/enhanced-maker.js
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME}
+      - R2_PUBLIC_URL=${R2_PUBLIC_URL}
+    volumes:
+      - /home/nmtech/n8n/ENHANCED MAKER Video Generatorv2:/opt/enhanced-maker/enhanced-maker.js:ro
+      - remotion_output:/app/output
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - n8n_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Next.js Video Creator UI
+  video-creator-ui:
+    build:
+      context: ./video-creator-ui
+      target: development
+    container_name: video-creator-ui
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - NEXT_PUBLIC_REMOTION_API_URL=http://localhost:3001
+    depends_on:
+      remotion-renderer:
+        condition: service_healthy
+    networks:
+      - n8n_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  ngrok_n8n_data:      # Updated volume name
+    external: true      # Mark as externally created
+  ngrok_n8n_data_2:    # Updated volume name
+    external: true      # Mark as externally created
+  redis_data:
+  rabbitmq_data:
+  remotion_output:
+
+networks:
+  n8n_network:
+    driver: bridge
