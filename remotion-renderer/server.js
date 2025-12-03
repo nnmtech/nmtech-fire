@@ -13,6 +13,7 @@ const Redis = require('ioredis');
 const amqp = require('amqplib');
 const sharp = require('sharp');
 const { generateCreativeScenes } = require('./ai-scene-generator');
+const { prepareAudioForVideo } = require('./audio-generator');
 
 // Load enhanced-maker library
 const enhancedMakerPath = process.env.ENHANCED_MAKER_PATH || '../enhanced-maker.js';
@@ -134,11 +135,9 @@ async function uploadToMinIO(filePath, key) {
 
     await minioClient.send(command);
     
-    // For local MinIO, we'll use ngrok URL which we'll get from logs
-    // Format: https://xyz.ngrok.io/bucket/key
-    const publicUrl = `http://localhost:9000/${MINIO_BUCKET}/${key}`;
+    // MinIO public URL - accessible from browser at localhost:9002
+    const publicUrl = `http://localhost:9002/${MINIO_BUCKET}/${key}`;
     console.log(`   ✅ Uploaded to MinIO: ${publicUrl}`);
-    console.log(`   🌐 Access via ngrok - check 'docker logs ngrok-minio' for public URL`);
     return publicUrl;
   } catch (error) {
     console.error(`Failed to upload to MinIO:`, error);
@@ -213,6 +212,16 @@ app.post('/render', async (req, res) => {
           enhancedProps = creativeContent;
           console.log(`🎨 Enhanced with creative AI content`);
           console.log(`   Enhanced Props:`, JSON.stringify(enhancedProps, null, 2));
+          
+          // Generate audio (background music + voiceover)
+          console.log(`🎵 Preparing audio...`);
+          const audioConfig = await prepareAudioForVideo(
+            description,
+            enhancedProps.scenes || [],
+            executionId
+          );
+          enhancedProps.audio = audioConfig;
+          console.log(`   Audio ready:`, audioConfig.backgroundMusic, audioConfig.voiceover ? '+ voiceover' : '(no voiceover)');
         }
       }
     }
@@ -288,14 +297,14 @@ app.post('/render', async (req, res) => {
     console.log('☁️  Uploading to MinIO...');
     const videoUrl = await uploadToMinIO(
       outputPath,
-      `videos/${userId || 'anonymous'}/${executionId}.mp4`
+      `${userId || 'anonymous'}/${executionId}.mp4`
     );
 
     let thumbnailUrl = null;
     if (thumbnailPath) {
       thumbnailUrl = await uploadToMinIO(
         thumbnailPath,
-        `thumbnails/${userId || 'anonymous'}/${executionId}-thumb.png`
+        `${userId || 'anonymous'}/${executionId}-thumb.png`
       );
     }
 

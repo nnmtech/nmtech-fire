@@ -181,6 +181,8 @@ services:
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minio123456}
       - MINIO_BUCKET_NAME=videos
       - MINIO_USE_SSL=false
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      - ELEVENLABS_VOICE_ID=${ELEVENLABS_VOICE_ID:-EXAVITQu4vr4xnSDxMaL}
     volumes:
       - /home/nmtech/n8n/ENHANCED MAKER Video Generatorv2:/opt/enhanced-maker/enhanced-maker.js:ro
       - remotion_output:/app/output

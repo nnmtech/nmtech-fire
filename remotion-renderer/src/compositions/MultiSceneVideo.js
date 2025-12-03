@@ -3,11 +3,16 @@ import React from 'react';
 import { AbsoluteFill, Sequence, interpolate, useCurrentFrame } from 'remotion';
 import { TextScene } from './TextScene';
 import { ImageScene } from './ImageScene';
+import { AudioTrack } from './AudioTrack';
 
-export const MultiSceneVideo = ({ scenes }) => {
+export const MultiSceneVideo = ({ scenes, audio }) => {
   // scenes format: [{ type: 'text', duration: 90, props: {...} }, { type: 'image', duration: 120, props: {...} }]
+  // audio format: { backgroundMusic: '/audio/music/calm.mp3', voiceover: '/audio/voiceovers/123.mp3', musicVolume: 0.2, voiceoverVolume: 1.0 }
   
   console.log('MultiSceneVideo rendering with scenes:', JSON.stringify(scenes, null, 2));
+  if (audio) {
+    console.log('Audio configuration:', JSON.stringify(audio, null, 2));
+  }
   
   if (!scenes || scenes.length === 0) {
     return (
@@ -29,6 +34,17 @@ export const MultiSceneVideo = ({ scenes }) => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
+      {/* Audio Layer - Background Music + Voiceover */}
+      {audio && (
+        <AudioTrack
+          backgroundMusic={audio.backgroundMusic}
+          voiceover={audio.voiceover}
+          musicVolume={audio.musicVolume}
+          voiceoverVolume={audio.voiceoverVolume}
+        />
+      )}
+
+      {/* Visual Scenes */}
       {scenes.map((scene, index) => {
         const { start: sceneStart, duration: sceneDuration } = sceneTimings[index];
         const isLastScene = index === scenes.length - 1;
