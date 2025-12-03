@@ -55,20 +55,21 @@ const supabase = createClient(
 
 console.log('🔑 Supabase initialized:', process.env.SUPABASE_URL ? '✓' : '✗');
 
-// Initialize Cloudflare R2 Client
-const r2Client = new S3Client({
-  region: 'auto',
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+// Initialize MinIO Client (S3-compatible, local or remote)
+const minioClient = new S3Client({
+  region: 'us-east-1', // MinIO doesn't care about region
+  endpoint: process.env.MINIO_ENDPOINT || 'http://minio:9000',
   credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+    accessKeyId: process.env.MINIO_ACCESS_KEY || 'admin',
+    secretAccessKey: process.env.MINIO_SECRET_KEY || 'minio123456',
   },
+  forcePathStyle: true, // Required for MinIO
 });
 
-const R2_BUCKET = process.env.R2_BUCKET_NAME;
-const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL; // e.g., https://videos.yourdomain.com or R2 public bucket URL
+const MINIO_BUCKET = process.env.MINIO_BUCKET_NAME || 'videos';
+const MINIO_USE_SSL = process.env.MINIO_USE_SSL === 'true';
 
-console.log('☁️  Cloudflare R2 initialized:', R2_BUCKET ? '✓' : '✗');
+console.log('☁️  MinIO initialized:', process.env.MINIO_ENDPOINT ? '✓' : '✗');
 
 // Initialize infrastructure
 let stateManager, messageQueue;
@@ -118,27 +119,29 @@ async function generateThumbnail(videoPath, executionId) {
   }
 }
 
-// Helper: Upload file to Cloudflare R2
-async function uploadToR2(filePath, key) {
+// Helper: Upload file to MinIO (local S3-compatible storage)
+async function uploadToMinIO(filePath, key) {
   try {
     const fileBuffer = fs.readFileSync(filePath);
     const contentType = key.includes('.mp4') ? 'video/mp4' : 'image/png';
     
     const command = new PutObjectCommand({
-      Bucket: R2_BUCKET,
+      Bucket: MINIO_BUCKET,
       Key: key,
       Body: fileBuffer,
       ContentType: contentType,
     });
 
-    await r2Client.send(command);
+    await minioClient.send(command);
     
-    // Construct public URL
-    const publicUrl = `${R2_PUBLIC_URL}/${key}`;
-    console.log(`   ✅ Uploaded to R2: ${publicUrl}`);
+    // For local MinIO, we'll use ngrok URL which we'll get from logs
+    // Format: https://xyz.ngrok.io/bucket/key
+    const publicUrl = `http://localhost:9000/${MINIO_BUCKET}/${key}`;
+    console.log(`   ✅ Uploaded to MinIO: ${publicUrl}`);
+    console.log(`   🌐 Access via ngrok - check 'docker logs ngrok-minio' for public URL`);
     return publicUrl;
   } catch (error) {
-    console.error(`Failed to upload to R2:`, error);
+    console.error(`Failed to upload to MinIO:`, error);
     return null;
   }
 }
@@ -281,16 +284,16 @@ app.post('/render', async (req, res) => {
     console.log('📸 Generating thumbnail...');
     const thumbnailPath = await generateThumbnail(outputPath, executionId);
 
-    // Upload to Cloudflare R2
-    console.log('☁️  Uploading to Cloudflare R2...');
-    const videoUrl = await uploadToR2(
+    // Upload to MinIO (local S3-compatible storage)
+    console.log('☁️  Uploading to MinIO...');
+    const videoUrl = await uploadToMinIO(
       outputPath,
       `videos/${userId || 'anonymous'}/${executionId}.mp4`
     );
 
     let thumbnailUrl = null;
     if (thumbnailPath) {
-      thumbnailUrl = await uploadToR2(
+      thumbnailUrl = await uploadToMinIO(
         thumbnailPath,
         `thumbnails/${userId || 'anonymous'}/${executionId}-thumb.png`
       );
