@@ -5,7 +5,7 @@ import { Audio } from 'remotion';
  * AudioTrack Component
  * Renders background music and voiceover with proper volume levels
  */
-export const AudioTrack = ({ backgroundMusic, voiceover, musicVolume = 0.2, voiceoverVolume = 1.0 }) => {
+export const AudioTrack = ({ backgroundMusic, voiceover, musicVolume = 0.5, voiceoverVolume = 1.0 }) => {
   console.log('AudioTrack render:', { backgroundMusic, voiceover, musicVolume, voiceoverVolume });
   
   return (
