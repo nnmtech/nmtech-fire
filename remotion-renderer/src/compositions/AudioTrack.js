@@ -6,15 +6,16 @@ import { Audio } from 'remotion';
  * Renders background music and voiceover with proper volume levels
  */
 export const AudioTrack = ({ backgroundMusic, voiceover, musicVolume = 0.2, voiceoverVolume = 1.0 }) => {
+  console.log('AudioTrack render:', { backgroundMusic, voiceover, musicVolume, voiceoverVolume });
+  
   return (
     <>
-      {/* Background Music - lower volume */}
+      {/* Background Music - lower volume, looped */}
       {backgroundMusic && (
         <Audio
           src={backgroundMusic}
           volume={musicVolume}
-          loop
-          startFrom={0}
+          loop={true}
         />
       )}
 
@@ -23,7 +24,6 @@ export const AudioTrack = ({ backgroundMusic, voiceover, musicVolume = 0.2, voic
         <Audio
           src={voiceover}
           volume={voiceoverVolume}
-          startFrom={0}
         />
       )}
     </>

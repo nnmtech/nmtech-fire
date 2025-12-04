@@ -13,15 +13,9 @@ async function generateCreativeScenes(description, composition) {
   // For now, use a rule-based approach to transform descriptions into scenes
   // TODO: Integrate with OpenAI/Anthropic for true AI generation
   
-  if (composition === 'TextScene') {
-    return generateTextScene(description);
-  } else if (composition === 'ImageScene') {
-    return generateImageScene(description);
-  } else if (composition === 'MultiSceneVideo') {
-    return generateMultiScene(description);
-  }
-  
-  return null;
+  // ALWAYS generate multi-scene videos for creative mode (ignore composition type)
+  // This creates full cinematic videos regardless of what UI selected
+  return generateMultiScene(description);
 }
 
 function generateTextScene(description) {

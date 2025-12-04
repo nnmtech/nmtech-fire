@@ -182,7 +182,7 @@ async function updateVideoStatus(executionId, updates) {
 
 // Render endpoint
 app.post('/render', async (req, res) => {
-  const { executionId, composition, inputProps, outputLocation, userId } = req.body;
+  let { executionId, composition, inputProps, outputLocation, userId } = req.body;
   
   if (!executionId || !composition) {
     return res.status(400).json({ error: 'executionId and composition are required' });
@@ -212,6 +212,12 @@ app.post('/render', async (req, res) => {
           enhancedProps = creativeContent;
           console.log(`🎨 Enhanced with creative AI content`);
           console.log(`   Enhanced Props:`, JSON.stringify(enhancedProps, null, 2));
+          
+          // Override composition to MultiSceneVideo when creative mode generates scenes
+          if (enhancedProps.scenes && enhancedProps.scenes.length > 0) {
+            composition = 'MultiSceneVideo';
+            console.log(`   📽️  Switched to MultiSceneVideo composition (${enhancedProps.scenes.length} scenes)`);
+          }
           
           // Generate audio (background music + voiceover)
           console.log(`🎵 Preparing audio...`);
@@ -259,6 +265,7 @@ app.post('/render', async (req, res) => {
     console.log('📦 Bundling Remotion project...');
     const bundleLocation = await bundle({
       entryPoint: path.join(__dirname, 'src/index.js'),
+      publicDir: path.join(__dirname, 'public'),
       webpackOverride: (config) => config,
     });
 

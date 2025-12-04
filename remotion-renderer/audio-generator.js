@@ -26,7 +26,9 @@ function selectBackgroundMusic(mood, theme) {
   };
 
   const selectedTrack = musicMap[mood.toLowerCase()] || 'calm-peaceful.mp3';
-  return `/audio/music/${selectedTrack}`;
+  
+  // Return path relative to bundle root (public folder is inside bundle)
+  return `/public/audio/music/${selectedTrack}`;
 }
 
 /**
@@ -65,34 +67,22 @@ function generateVoiceoverScript(description, scenes) {
 }
 
 /**
- * Generate voiceover using ElevenLabs API
+ * Generate voiceover using simple TTS (Google TTS - free, open-source)
  */
 async function generateVoiceover(text, outputPath) {
-  if (!ELEVENLABS_API_KEY) {
-    console.log('⚠️  ElevenLabs API key not set, skipping voiceover generation');
-    return null;
-  }
-
+  const TTS_URL = process.env.TTS_URL || 'http://simple-tts:5002';
+  
   try {
-    console.log(`🎙️  Generating voiceover: "${text.substring(0, 50)}..."`);
+    console.log(`🎙️  Generating voiceover with gTTS: "${text.substring(0, 50)}..."`);
     
     const response = await axios({
-      method: 'POST',
-      url: `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`,
-      headers: {
-        'Accept': 'audio/mpeg',
-        'xi-api-key': ELEVENLABS_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      data: {
+      method: 'GET',
+      url: `${TTS_URL}/tts`,
+      params: {
         text: text,
-        model_id: 'eleven_monolingual_v1',
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
-        },
       },
       responseType: 'arraybuffer',
+      timeout: 30000, // 30 second timeout
     });
 
     // Save audio file
@@ -102,9 +92,46 @@ async function generateVoiceover(text, outputPath) {
     console.log(`✅ Voiceover saved: ${outputPath}`);
     return outputPath;
   } catch (error) {
-    console.error('Failed to generate voiceover:', error.response?.data || error.message);
+    console.error('Failed to generate voiceover:', error.message);
+    console.log('⚠️  Continuing without voiceover');
     return null;
   }
+}
+
+/**
+ * Mix background music and voiceover into a single audio file
+ */
+async function mixAudioTracks(musicPath, voiceoverPath, outputPath, musicVolume, voiceoverVolume) {
+  return new Promise((resolve, reject) => {
+    const fullMusicPath = path.join(__dirname, musicPath.replace('/public/', 'public/'));
+    
+    if (!voiceoverPath) {
+      // No voiceover, just use music
+      const { exec } = require('child_process');
+      exec(`ffmpeg -i "${fullMusicPath}" -af "volume=${musicVolume}" -t 140 "${outputPath}" -y`, (error) => {
+        if (error) {
+          console.error('Failed to process music:', error);
+          reject(error);
+        } else {
+          resolve(outputPath);
+        }
+      });
+    } else {
+      // Mix music and voiceover
+      const { exec } = require('child_process');
+      const cmd = `ffmpeg -i "${fullMusicPath}" -i "${voiceoverPath}" -filter_complex "[0:a]volume=${musicVolume}[music];[1:a]volume=${voiceoverVolume}[voice];[music][voice]amix=inputs=2:duration=first:dropout_transition=0" -t 140 "${outputPath}" -y`;
+      
+      exec(cmd, (error, stdout, stderr) => {
+        if (error) {
+          console.error('Failed to mix audio:', error);
+          reject(error);
+        } else {
+          console.log('✅ Audio mixed successfully');
+          resolve(outputPath);
+        }
+      });
+    }
+  });
 }
 
 /**
@@ -120,16 +147,30 @@ async function prepareAudioForVideo(description, scenes, executionId) {
   // Generate voiceover script
   const script = generateVoiceoverScript(description, scenes);
   
-  // Generate voiceover audio (if API key available)
+  // Generate voiceover audio
   const voiceoverOutputPath = path.join(__dirname, 'public/audio/voiceovers', `${executionId}.mp3`);
   const voiceoverPath = await generateVoiceover(script, voiceoverOutputPath);
   
+  // Mix audio tracks into a single file
+  const mixedAudioPath = path.join(__dirname, 'public/audio/mixed', `${executionId}.mp3`);
+  fs.mkdirSync(path.dirname(mixedAudioPath), { recursive: true });
+  
+  await mixAudioTracks(
+    musicPath,
+    voiceoverPath,
+    mixedAudioPath,
+    0.5, // music volume
+    0.8  // voiceover volume
+  );
+  
+  console.log(`   Audio ready: mixed track at /public/audio/mixed/${executionId}.mp3`);
+  
   return {
-    backgroundMusic: musicPath,
-    voiceover: voiceoverPath ? `/audio/voiceovers/${executionId}.mp3` : null,
+    backgroundMusic: `/public/audio/mixed/${executionId}.mp3`,
+    voiceover: null, // Already mixed in
     voiceoverScript: script,
-    musicVolume: 0.2, // 20% volume for background music
-    voiceoverVolume: 1.0, // 100% volume for narration
+    musicVolume: 1.0,
+    voiceoverVolume: 1.0,
   };
 }
 

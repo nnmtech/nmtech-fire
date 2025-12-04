@@ -70,13 +70,13 @@ services:
       start_period: 40s
 
   # ngrok (unchanged - still points to original n8n)
-  grok:
+  ngrok:
     image: ngrok/ngrok:latest
     container_name: ngrok
     restart: unless-stopped
-    command: http -- 38a4cfa95fe4.ngrok-free.app n8n:5678
+    command: http --domain=38a4cfa95fe4.ngrok-free.app n8n:5678
     environment:
-      - NGROUTHTOKEN=${NGROK_AUTHTOKEN}
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
     depends_on:
       n8n:
         condition: service_healthy
@@ -181,8 +181,7 @@ services:
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minio123456}
       - MINIO_BUCKET_NAME=videos
       - MINIO_USE_SSL=false
-      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
-      - ELEVENLABS_VOICE_ID=${ELEVENLABS_VOICE_ID:-EXAVITQu4vr4xnSDxMaL}
+      - TTS_URL=http://simple-tts:5002
     volumes:
       - /home/nmtech/n8n/ENHANCED MAKER Video Generatorv2:/opt/enhanced-maker/enhanced-maker.js:ro
       - remotion_output:/app/output
@@ -218,6 +217,22 @@ services:
       - n8n_network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Simple TTS - Google Text-to-Speech (free, no API key)
+  simple-tts:
+    build: ./simple-tts
+    container_name: simple-tts
+    restart: unless-stopped
+    ports:
+      - "5002:5002"
+    networks:
+      - n8n_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
       interval: 30s
       timeout: 10s
       retries: 3
