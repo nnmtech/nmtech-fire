@@ -44,6 +44,9 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+// Serve audio files statically
+app.use('/audio', express.static(path.join(__dirname, 'public/audio')));
+
 const PORT = process.env.PORT || 3001;
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 const RABBITMQ_URL = process.env.MESSAGE_QUEUE_URL || 'amqp://localhost:5672';
